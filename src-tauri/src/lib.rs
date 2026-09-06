@@ -1,7 +1,7 @@
-/// Get config directory path (统一使用 ~/.config/cludix-totp/)
+/// Get config directory path (统一使用 ~/.config/omnitotp/)
 fn get_config_dir() -> Result<std::path::PathBuf, String> {
     let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
-    Ok(home.join(".config").join("cludix-totp"))
+    Ok(home.join(".config").join("omnitotp"))
 }
 
 #[tauri::command]

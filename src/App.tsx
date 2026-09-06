@@ -120,7 +120,7 @@ function App() {
     <div className="container">
       <div className="header">
         <div>
-          <h1>Cludix TOTP</h1>
+          <h1>OmniTOTP</h1>
         </div>
         <div className="header-actions">
           <label className="settings-toggle">

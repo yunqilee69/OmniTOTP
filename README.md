@@ -1,4 +1,4 @@
-# Cludix TOTP
+# OmniTOTP
 
 基于 Tauri + React 构建的轻量级 TOTP (Time-based One-Time Password) 桌面应用，用于管理多账号的两步验证密码。
 
@@ -110,9 +110,9 @@ otpauth://totp/ExampleCorp:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Examp
 
 | 系统 | 路径 |
 |------|------|
-| Windows | `C:\Users\<用户名>\.config\cludix-totp\config.json` |
-| macOS | `~/.config/cludix-totp/config.json` |
-| Linux | `~/.config/cludix-totp/config.json` |
+| Windows | `C:\Users\<用户名>\.config\omnitotp\config.json` |
+| macOS | `~/.config/omnitotp/config.json` |
+| Linux | `~/.config/omnitotp/config.json` |
 
 ### 配置文件格式
 
@@ -142,7 +142,7 @@ otpauth://totp/ExampleCorp:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Examp
 ## 项目结构
 
 ```
-cludix-totp/
+omnitotp/
 ├── src/                    # React 前端
 │   ├── components/         # UI 组件
 │   ├── utils/              # TOTP 算法

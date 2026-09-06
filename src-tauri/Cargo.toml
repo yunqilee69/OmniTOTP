@@ -1,12 +1,12 @@
 [package]
-name = "cludix-totp"
+name = "omnitotp"
 version = "1.0.0"
-description = "Cludix TOTP desktop application"
+description = "OmniTOTP desktop application"
 authors = ["yunqilee69"]
 edition = "2021"
 
 [lib]
-name = "cludix_totp_lib"
+name = "omnitotp_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
