@@ -1,46 +1,68 @@
 name: Release
 
+# 推送 v* tag 时在 Windows / macOS / Linux 三端构建并发布 GitHub Release；
+# 也可在 Actions 页面手动指定已有 tag 重新发布（例如某个平台构建失败后补发）。
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要发布的已有 tag，例如 v1.1.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+
 jobs:
-  build:
-    name: Build ${{ matrix.platform.name }}
-    runs-on: ${{ matrix.platform.os }}
+  release:
+    name: Release (${{ matrix.name }})
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
-        platform:
-          - name: Windows
-            os: windows-latest
-            build_script: build:win
-            artifact_name: windows-bundles
-            artifact_glob: |
-              src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-              src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
-          - name: macOS
-            os: macos-latest
-            build_script: build:mac
-            artifact_name: macos-bundles
-            artifact_glob: |
-              src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
-          - name: Linux
-            os: ubuntu-22.04
-            build_script: build:linux
-            artifact_name: linux-bundles
-            artifact_glob: |
-              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
-              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
-              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
+        include:
+          - name: Windows x64
+            platform: windows-latest
+            args: --target x86_64-pc-windows-msvc
+          - name: macOS Universal
+            platform: macos-latest
+            args: --target universal-apple-darwin
+          - name: Linux x64
+            platform: ubuntu-22.04
+            args: ""
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      # 三处版本号必须与 tag 一致，避免发出去的安装包版本和 Release 对不上
+      - name: Verify version matches tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${TAG#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          conf="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          cargo="$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n 1)"
+
+          echo "tag=${tag} package.json=${pkg} tauri.conf.json=${conf} Cargo.toml=${cargo}"
+          [ "$pkg" = "$tag" ] || { echo "::error::package.json 版本 $pkg 与 tag $tag 不一致"; exit 1; }
+          [ "$conf" = "$tag" ] || { echo "::error::tauri.conf.json 版本 $conf 与 tag $tag 不一致"; exit 1; }
+          [ "$cargo" = "$tag" ] || { echo "::error::Cargo.toml 版本 $cargo 与 tag $tag 不一致"; exit 1; }
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -51,66 +73,47 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Add Rust targets for macOS universal build
-        if: matrix.platform.os == 'macos-latest'
-        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+      - name: Add macOS universal targets
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          cache-on-failure: true
 
       - name: Install Linux system dependencies
-        if: matrix.platform.os == 'ubuntu-22.04'
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
-            patchelf \
-            libgtk-3-dev \
-            libglib2.0-dev \
             libssl-dev \
-            libayatana-appindicator3-dev
+            libxdo-dev \
+            libgtk-3-dev \
+            patchelf \
+            xdg-utils
 
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build desktop bundle
-        run: npm run ${{ matrix.platform.build_script }}
-
-      - name: Upload release bundles
-        uses: actions/upload-artifact@v4
+      - name: Build and publish release bundles
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: ${{ matrix.platform.artifact_name }}
-          path: ${{ matrix.platform.artifact_glob }}
-          if-no-files-found: error
+          tagName: ${{ env.TAG }}
+          releaseName: OmniTOTP ${{ env.TAG }}
+          releaseBody: |
+            OmniTOTP ${{ env.TAG }} 桌面安装包。
 
-  release:
-    name: Publish GitHub Release
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Download Windows bundles
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-bundles
-          path: release-assets/windows
-
-      - name: Download macOS bundles
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-bundles
-          path: release-assets/macos
-
-      - name: Download Linux bundles
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-bundles
-          path: release-assets/linux
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: |
-            release-assets/windows/**/*
-            release-assets/macos/**/*
-            release-assets/linux/**/*
+            - Windows：`.msi` / `.exe`（NSIS）
+            - macOS：`.dmg`（Universal，Intel + Apple Silicon）
+            - Linux：`.AppImage` / `.deb` / `.rpm`
+          generateReleaseNotes: true
+          prerelease: ${{ contains(env.TAG, '-') }}
+          releaseDraft: false
+          args: ${{ matrix.args }}

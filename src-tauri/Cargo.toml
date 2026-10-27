@@ -1,6 +1,6 @@
 [package]
 name = "omnitotp"
-version = "1.0.0"
+version = "1.1.0"
 description = "OmniTOTP desktop application"
 authors = ["yunqilee69"]
 edition = "2021"

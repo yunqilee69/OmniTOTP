@@ -65,6 +65,22 @@ npm run build:linux-arm64
 | Linux | `src-tauri/target/release/bundle/rpm/` | `.rpm` 包 |
 | Linux | `src-tauri/target/release/bundle/appimage/` | `.AppImage` |
 
+### 发布新版本（GitHub Actions 三端构建）
+
+推送 `v*` tag 后，GitHub Actions 会并行在 Windows、macOS、Linux 上构建，并把安装包上传到对应 tag 的 GitHub Release。
+
+```bash
+# 1. 同步修改三处版本号
+#    package.json / src-tauri/tauri.conf.json / src-tauri/Cargo.toml
+# 2. 提交改动后打 tag 并推送
+git add -A
+git commit -m "chore: 发布 1.1.0"
+git tag v1.1.0
+git push origin main --tags
+```
+
+工作流会校验 tag 与三处版本号的一致性，不一致会直接失败。若某个平台构建失败，可在 Actions 页面手动运行 `Release` 工作流并填写已有 tag 重新发布，已上传的产物会自动补齐。
+
 ## 使用方式
 
 ### 添加账号
